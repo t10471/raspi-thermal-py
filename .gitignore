@@ -111,3 +111,7 @@ dmypy.json
 
 
 credentials.json
+settings.yaml
+link.yaml
+client_secrets.json
+images/*
