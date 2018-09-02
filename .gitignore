@@ -112,6 +112,7 @@ dmypy.json
 
 credentials.json
 settings.yaml
-link.yaml
+config.yaml
 client_secrets.json
 images/*
+remo.json
