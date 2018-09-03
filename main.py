@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # opyright (c) 2017 Adafruit Industries
-# Author: Carter Nelson, tt0471
+# Author: Carter Nelson, t10471
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
