@@ -63,7 +63,10 @@ class Thermal:
                         min=self.min, max=self.max, scale=self.scale)
 
     def _make_dir(self):
-        shutil.rmtree(os.path.join(os.getcwd(), IMAGE_DIR))
+        try:
+            shutil.rmtree(os.path.join(os.getcwd(), IMAGE_DIR))
+        except Exception:
+            pass
         img_dir = os.path.join(os.getcwd(), IMAGE_DIR, self.dt)
         os.makedirs(img_dir, exist_ok=True)
         return img_dir
