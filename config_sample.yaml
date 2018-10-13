@@ -1,0 +1,33 @@
+main:
+  # logの出力レベル
+  log_level: "DEBUG"
+  # driveにサーモグラフィーをアップするかどうか？
+  use_drive: true
+  # Remoのコントロールをするか？
+  use_remo: true
+  # 画像の拡大スケール
+  scale: 100
+  # 温度をは測る間隔(秒)
+  interval: 600
+  # 終了時間(24時間表記)
+  end: "8:50:00"
+  # サーモグラフィーの最低温度
+  min: 26.0
+  # サーモグラフィーの最大温度
+  max: 40.0
+  # trueの場合、ログにだけ温度を出力し、画像は保存しない
+  report: false
+drive:
+  # サーーモグラフィーの保存フォルダ
+  link: "xxxxxx"
+remo:
+  # Remoで下げる最低温度
+  min: 24
+  # Remoで上げる最大温度
+  max: 28
+  # 指定した値以下の変化の場合、温度を変更しない
+  margin: 0.5
+  # remo出使うtoken
+  token: xxxxxxxxxxxxxxxxxxxxxxxxxxx
+  # 捜査するエアコンのID
+  appliance: xxxxxxxxxxxxxxxxxxxxxxx
