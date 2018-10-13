@@ -23,7 +23,8 @@
 import os
 import sys
 import shutil
-import argparse
+import logging
+import yaml
 from time import sleep
 from datetime import datetime
 from colour import Color
@@ -31,31 +32,61 @@ from colour import Color
 from Adafruit_AMG88xx import Adafruit_AMG88xx
 from PIL import Image, ImageDraw
 
-from upload import uploadfiles
-from remo import update_setting
+from upload import GDriveFactory
+from remo import RemoFactory
 
 NX = 8
 NY = 8
 COLORDEPTH = 256
+COF_NAME = 'config.yaml'
 IMAGE_DIR = 'images'
+LOG_DIR = 'logs'
 
 class Thermal:
 
-    def __init__(self, args):
-        self.interval = args.interval
-        self.min = args.min
-        self.max = args.max
-        self.report = args.report
-        self.scale = args.scale
-        self.dt = "{0:%Y-%m-%d}".format(datetime.now())
-        self.end = datetime.strptime('{0} {1:%H:%M:%S}'.format(self.dt, datetime.strptime(args.end, '%H:%M:%S')), '%Y-%m-%d %H:%M:%S')
+    def __init__(self, fname):
+        with open(fname, "r") as f:
+            config = yaml.load(f)['main']
+        self.logger = self._setup_logger(config)
+        self.gdrive = GDriveFactory.create(config, fname)
+        self.remo = RemoFactory.create(config, fname)
+        self.interval = config['interval']
+        self.min = config['min']
+        self.max = config['max']
+        self.report = config['report']
+        self.scale = config['scale']
+        self.dt = '{0:%Y-%m-%d}'.format(datetime.now())
+        m = '{0} {1:%H:%M:%S}'.format(self.dt, datetime.strptime(config['end'], '%H:%M:%S'))
+        self.end = datetime.strptime(m, '%Y-%m-%d %H:%M:%S')
         self.img_dir = self._make_dir()
         # color map
-        cs = list(Color("indigo").range_to(Color("red"), COLORDEPTH))
+        cs = list(Color('indigo').range_to(Color('red'), COLORDEPTH))
         self.colors = [(int(c.red * 255), int(c.green * 255), int(c.blue * 255)) for c in cs]
         self.sensor = Adafruit_AMG88xx()
         # wait for it to boot
         sleep(.1)
+
+    def _setup_logger(self, config):
+        levels = {'CRITICAL': logging.CRITICAL,
+                  'ERROR': logging.ERROR,
+                  'WARNING': logging.WARNING,
+                  'INFO': logging.INFO,
+                  'DEBUG': logging.DEBUG
+                  }
+        if config['log_level'] not in levels.keys():
+            print('{} is invalid log_level'.format(config['log_level']))
+            sys.exit(1)
+        logger = logging.getLogger('Thermal')
+        logger.setLevel(levels[config['log_level']])
+        handler_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        os.makedirs(os.path.join(os.getcwd(), LOG_DIR), exist_ok=True)
+        p = os.path.join(os.getcwd(), LOG_DIR, '{0:%Y-%m-%d}.log'.format(datetime.now()))
+        handler = logging.FileHandler(p, 'w')
+        handler.setLevel(levels[config['log_level']])
+        handler.setFormatter(handler_format)
+        logger.addHandler(handler)
+
+        return logger
 
     def __str__(self):
         s = 'Thermal (interval: {interval}, end: {end}, img_dir: {img_dir}, min: {min}, max {max}, scale: {scale})'
@@ -72,6 +103,7 @@ class Thermal:
         return img_dir
 
     def main(self):
+        self.logger.info('start')
         self._execute()
         sleep(self.interval)
         while True:
@@ -79,14 +111,15 @@ class Thermal:
             if datetime.now() >= self.end:
                 break
             sleep(self.interval)
-        uploadfiles(self.img_dir)
+        self.gdrive.upload(self.img_dir)
+        self.logger.info('end')
 
     def _execute(self):
         pixels = self._make_pixels()
         if self.report:
             return
-        self._update_settings(pixels)
         self._save_image(pixels)
+        self.remo.update(pixels)
 
     def _make_pixels(self):
 
@@ -95,14 +128,12 @@ class Thermal:
 
         # get sensor readings
         pixels = self.sensor.readPixels()
-
-        print("Min Pixel = {0} C".format(min(pixels))) 
-        print("Max Pixel = {0} C".format(max(pixels)))
-        print("Thermistor = {0} C".format(self.sensor.readThermistor()))
+        m = 'Min Pixel = {} C Max Pixel = {} C Thermistor = {} C'
+        self.logger.debug(m.format(min(pixels), max(pixels), self.sensor.readThermistor()))
 
         # map sensor readings to color map
-        MINTEMP = min(pixels) if self.min == None else self.min
-        MAXTEMP = max(pixels) if self.max == None else self.max
+        MINTEMP = min(pixels) if self.min is None else self.min
+        MAXTEMP = max(pixels) if self.max is None else self.max
         pixels = [_map(p, MINTEMP, MAXTEMP, 0, COLORDEPTH - 1) for p in pixels]
         return pixels
 
@@ -112,30 +143,17 @@ class Thermal:
             return min(max_val, max(min_val, val))
 
         # output image buffer
-        image = Image.new("RGB", (NX, NY), "white")
+        image = Image.new('RGB', (NX, NY), 'white')
         draw = ImageDraw.Draw(image)
         # create the image
         for ix in range(NX):
             for iy in range(NY):
                 draw.point([(ix, iy % NX)], fill=self.colors[_constrain(int(pixels[ix + NX * iy]), 0, COLORDEPTH - 1)])
-        save_path = os.path.join(self.img_dir, "{0:%H:%M:%S}.jpg".format(datetime.now()))
+        save_path = os.path.join(self.img_dir, '{0:%H:%M:%S}.jpg'.format(datetime.now()))
         # scale and save
         image.resize((NX * self.scale, NY * self.scale), Image.BICUBIC).save(save_path)
-        print('save image {}'.format(save_path))
+        self.logger.info('save image {}'.format(save_path))
 
-    def _update_settings(self, pixels):
-        # TODO
-        if False:
-            update_settings()
 
 if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser(description='Save image')
-    parser.add_argument('-s','--scale', type=int, default=100, help='specify image scale')
-    parser.add_argument('--interval', type=int, default=600, help='specify interval')
-    parser.add_argument('--end', type=str, default='8:50:00', help='specify end time')
-    parser.add_argument('--min', type=float, help='specify minimum temperature')
-    parser.add_argument('--max', type=float, help='specify maximum temperature')
-    parser.add_argument('--report', action='store_true', default=False, help='show sensor information without saving image')
-    args = parser.parse_args()
-    Thermal(args).main()
+    Thermal(COF_NAME).main()
