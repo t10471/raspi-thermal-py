@@ -16,7 +16,7 @@ class DummyRemo:
     def __init__(self, fname):
         pass
 
-    def update(self):
+    def update(self, pixels):
         pass
 
 class Remo:
