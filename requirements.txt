@@ -3,7 +3,7 @@ Adafruit-bitfield==1.5.1
 Adafruit-GPIO==1.0.3
 Adafruit-PureIO==0.2.3
 cachetools==2.1.0
-certifi==2018.8.24
+certifi==2022.12.7
 chardet==3.0.4
 colour==0.1.5
 cryptography==1.7.1
